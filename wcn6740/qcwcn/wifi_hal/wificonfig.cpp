@@ -956,6 +956,11 @@ wifi_error WiFiConfigCommand::requestEvent()
         res = WIFI_ERROR_OUT_OF_MEMORY;
         goto out;
     }
+    if (mInfo == NULL || mInfo->cmd_sock == NULL) {
+        ALOGE("%s: Wifi is turned of or socket is Null",__FUNCTION__);
+        res = WIFI_ERROR_UNKNOWN;
+        goto out;
+    }
 
     status = nl_send_auto_complete(mInfo->cmd_sock, mMsg.getMessage());
     if (status < 0) {
@@ -1216,7 +1221,7 @@ wifi_error wifi_set_latency_mode(wifi_interface_handle iface,
         level = QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_NORMAL;
         break;
     case WIFI_LATENCY_MODE_LOW:
-        level = QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_ULTRALOW;
+        level = QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_LOW;
         break;
     default:
         ALOGI("%s: Unsupported latency mode=%d, resetting to NORMAL!", __FUNCTION__, mode);
@@ -1436,6 +1441,81 @@ wifi_error wifi_multi_sta_set_use_case(wifi_handle handle,
         QCA_WLAN_VENDOR_ATTR_CONCURRENT_STA_POLICY_CONFIG, use_case)) {
         ret = WIFI_ERROR_UNKNOWN;
         ALOGE("%s: failed to put use_case. Error:%d",
+            __FUNCTION__, ret);
+        goto cleanup;
+    }
+    wifiConfigCommand->attr_end(nlData);
+
+    /* Send the NL msg. */
+    wifiConfigCommand->waitForRsp(false);
+    ret = wifiConfigCommand->requestEvent();
+    if (ret != 0) {
+        ALOGE("%s: requestEvent Error:%d", __FUNCTION__, ret);
+        goto cleanup;
+    }
+
+cleanup:
+    delete wifiConfigCommand;
+    return (wifi_error)ret;
+}
+
+/**
+ * Invoked to set voip optimization mode for the provided STA iface
+ */
+ wifi_error wifi_set_voip_mode(wifi_interface_handle iface, wifi_voip_mode mode)
+{
+    int requestId, ret = 0;
+    WiFiConfigCommand *wifiConfigCommand;
+
+    struct nlattr *nlData;
+    interface_info *ifaceInfo = getIfaceInfo(iface);
+
+    wifi_handle wifiHandle = getWifiHandle(iface);
+    if (!wifiHandle) {
+        ALOGE("%s: Error wifi_handle NULL", __FUNCTION__);
+        return WIFI_ERROR_UNKNOWN;
+    }
+
+    requestId = get_requestid();
+    ALOGV("%s: voip mode=%d", __FUNCTION__, mode);
+    wifiConfigCommand = new WiFiConfigCommand(
+                            wifiHandle,
+                            requestId,
+                            OUI_QCA,
+                            QCA_NL80211_VENDOR_SUBCMD_SET_WIFI_CONFIGURATION);
+
+    if (wifiConfigCommand == NULL) {
+        ALOGE("%s: Error wifiConfigCommand NULL", __FUNCTION__);
+        return WIFI_ERROR_UNKNOWN;
+    }
+
+    /* Create the NL message. */
+    ret = wifiConfigCommand->create();
+    if (ret < 0) {
+        ALOGE("%s: failed to create NL msg. Error:%d",
+            __FUNCTION__, ret);
+        goto cleanup;
+    }
+
+    /* Set the interface Id of the message. */
+    ret = wifiConfigCommand->set_iface_id(ifaceInfo->name);
+    if (ret < 0) {
+        ALOGE("%s: failed to set iface id. Error:%d",
+            __FUNCTION__, ret);
+        goto cleanup;
+    }
+
+    /* Add the vendor specific attributes for the NL command. */
+    nlData = wifiConfigCommand->attr_start(NL80211_ATTR_VENDOR_DATA);
+    if (!nlData) {
+        ALOGE("%s: failed attr_start for VENDOR_DATA. Error:%d",
+            __FUNCTION__, ret);
+        goto cleanup;
+    }
+
+    if (wifiConfigCommand->put_u8(
+        QCA_WLAN_VENDOR_ATTR_CONFIG_WFC_STATE, (u8)mode)) {
+        ALOGE("%s: failed to put vendor data. Error:%d",
             __FUNCTION__, ret);
         goto cleanup;
     }

@@ -35,8 +35,8 @@
 
 #include "common.h"
 #include "cpp_bindings.h"
-#include "rtt.h"
-#include "wifi_hal.h"
+#include <hardware_legacy/rtt.h>
+#include <hardware_legacy/wifi_hal.h>
 #include "wifihal_internal.h"
 
 /* Implementation of the API functions exposed in rtt.h */
@@ -121,7 +121,7 @@ wifi_error wifi_rtt_range_request(wifi_request_id id,
         return WIFI_ERROR_INVALID_ARGS;
     }
 
-    if (handler.on_rtt_results == NULL) {
+    if (handler.on_rtt_results == NULL && handler.on_rtt_results_v2 == NULL ) {
         ALOGE("wifi_rtt_range_request: NULL capabilities pointer provided."
             " Exit.");
         return WIFI_ERROR_INVALID_ARGS;
