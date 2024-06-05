@@ -17,12 +17,10 @@
 #include <stdlib.h>
 #include <linux/pkt_sched.h>
 #include <netlink/object-api.h>
-#include <netlink-private/object-api.h>
-#include <netlink-private/types.h>
 #include <dlfcn.h>
 #include <pthread.h>
 
-#include "wifi_hal.h"
+#include <hardware_legacy/wifi_hal.h>
 #include "common.h"
 #include <errno.h>
 
